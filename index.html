@@ -1,0 +1,990 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<meta name="theme-color" content="#0d0b06" />
+<title>Madhusri Jewellers • POS</title>
+
+<!-- jsPDF (library, works on GitHub Pages via CDN) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<style>
+  /* ============================================================
+     THEME
+     ============================================================ */
+  :root{
+    --bg:#0d0b06;
+    --bg-2:#15110a;
+    --card:#1c160d;
+    --card-2:#231b10;
+    --line:#3a2f1a;
+    --gold:#e7b53c;
+    --gold-2:#f6cf6b;
+    --gold-soft:#c79a2e;
+    --orange:#ff9d3c;
+    --text:#f4ecd8;
+    --muted:#9c9070;
+    --green:#33d17a;
+    --red:#ff5c5c;
+    --radius:16px;
+    --shadow:0 10px 30px rgba(0,0,0,.45);
+  }
+
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0}
+  body{
+    background:
+      radial-gradient(1200px 600px at 100% -10%, rgba(231,181,60,.10), transparent 60%),
+      radial-gradient(900px 500px at -10% 110%, rgba(255,157,60,.08), transparent 55%),
+      var(--bg);
+    color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Ubuntu,"Helvetica Neue",Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;
+    min-height:100dvh;
+    padding-bottom:96px;
+  }
+
+  /* ============================================================
+     HEADER
+     ============================================================ */
+  header{
+    position:sticky;top:0;z-index:30;
+    backdrop-filter:blur(10px);
+    background:linear-gradient(180deg, rgba(13,11,6,.92), rgba(13,11,6,.70));
+    border-bottom:1px solid var(--line);
+  }
+  .head-inner{
+    max-width:900px;margin:0 auto;padding:12px 16px;
+    display:flex;align-items:center;gap:12px;
+  }
+  .logo{
+    width:44px;height:44px;flex:0 0 auto;border-radius:12px;
+    display:grid;place-items:center;font-size:22px;
+    background:radial-gradient(circle at 30% 20%, var(--gold-2), var(--gold-soft));
+    color:#2a2000;box-shadow:0 4px 14px rgba(231,181,60,.35);
+  }
+  .brand h1{font-size:17px;margin:0;letter-spacing:.3px}
+  .brand p{margin:0;font-size:11px;color:var(--muted)}
+  .brand h1 span{color:var(--gold)}
+  .head-right{margin-left:auto;display:flex;align-items:center;gap:8px}
+  .sync-dot{width:9px;height:9px;border-radius:50%;background:var(--muted);box-shadow:0 0 0 3px rgba(255,255,255,.04)}
+  .sync-dot.ok{background:var(--green)}
+  .sync-dot.off{background:var(--red)}
+  .sync-dot.busy{background:var(--orange);animation:pulse 1s infinite}
+  @keyframes pulse{50%{opacity:.35}}
+  .sync-text{font-size:11px;color:var(--muted)}
+
+  /* ============================================================
+     LAYOUT
+     ============================================================ */
+  main{max-width:900px;margin:0 auto;padding:16px;display:grid;gap:16px}
+  @media(min-width:820px){
+    main{grid-template-columns:1fr 1fr;align-items:start}
+    .col-span{grid-column:1 / -1}
+  }
+
+  .card{
+    background:linear-gradient(180deg,var(--card),var(--card-2));
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    box-shadow:var(--shadow);
+    overflow:hidden;
+  }
+  .card-h{
+    display:flex;align-items:center;gap:8px;
+    padding:14px 16px;border-bottom:1px solid var(--line);
+  }
+  .card-h .ico{color:var(--gold);font-size:16px}
+  .card-h h2{font-size:14px;margin:0;letter-spacing:.4px;text-transform:uppercase;color:var(--gold-2)}
+  .card-h .pill{margin-left:auto;font-size:12px;color:var(--muted);background:rgba(255,255,255,.04);
+    padding:4px 10px;border-radius:999px;border:1px solid var(--line)}
+  .card-b{padding:16px}
+
+  /* ============================================================
+     FORM
+     ============================================================ */
+  .field{margin-bottom:14px}
+  .field:last-child{margin-bottom:0}
+  label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px;letter-spacing:.3px}
+  .req::after{content:" *";color:var(--orange)}
+  .opt{color:#6c6244;font-size:11px}
+  .edit-banner{
+    display:none;align-items:center;gap:8px;flex-wrap:wrap;
+    background:linear-gradient(90deg, rgba(255,157,60,.16), rgba(231,181,60,.08));
+    border:1px solid var(--gold-soft);border-radius:12px;
+    padding:10px 12px;margin-bottom:14px;font-size:13px;color:var(--gold-2);
+  }
+  .edit-banner.show{display:flex}
+  .edit-banner b{color:var(--text)}
+  .edit-banner span{margin-left:auto;color:var(--red);cursor:pointer;font-weight:600;
+    border:1px solid var(--line);padding:3px 10px;border-radius:8px}
+  .inp{
+    width:100%;font-size:17px;color:var(--text);
+    background:var(--bg-2);border:1px solid var(--line);
+    border-radius:12px;padding:14px 14px;outline:none;
+    transition:border .15s, box-shadow .15s;
+  }
+  .inp:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(231,181,60,.18)}
+  .inp::placeholder{color:#6c6244}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .with-unit{position:relative}
+  .with-unit .unit{position:absolute;right:12px;top:50%;transform:translateY(-50%);
+    font-size:12px;color:var(--muted);pointer-events:none}
+
+  /* ============================================================
+     TOTAL DISPLAY
+     ============================================================ */
+  .totals{display:grid;gap:8px;margin-top:4px}
+  .trow{display:flex;justify-content:space-between;font-size:14px;color:var(--muted)}
+  .trow b{color:var(--text);font-weight:600}
+  .tdiv{height:1px;background:var(--line);margin:6px 0}
+  .grand{
+    display:flex;justify-content:space-between;align-items:center;
+    background:linear-gradient(90deg, rgba(231,181,60,.12), rgba(255,157,60,.06));
+    border:1px solid var(--gold-soft);border-radius:14px;padding:14px 16px;margin-top:6px;
+  }
+  .grand span{font-size:13px;color:var(--gold-2);letter-spacing:.5px}
+  .grand b{font-size:26px;color:var(--gold-2);font-variant-numeric:tabular-nums}
+
+  /* ============================================================
+     BUTTONS
+     ============================================================ */
+  .btns{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px}
+  .btn{
+    border:1px solid var(--line);background:var(--card-2);color:var(--text);
+    font-size:14px;font-weight:600;padding:13px 12px;border-radius:12px;
+    display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;
+    transition:transform .05s, filter .15s;user-select:none;
+  }
+  .btn:active{transform:scale(.97)}
+  .btn.primary{background:linear-gradient(90deg,var(--gold),var(--gold-soft));color:#2a2000;border-color:transparent}
+  .btn.wa{background:linear-gradient(90deg,#25d366,#1eb257);color:#04210f;border-color:transparent}
+  .btn.ghost{background:transparent}
+  .btn.full{grid-column:1 / -1}
+  .btn[disabled]{opacity:.5;pointer-events:none}
+
+  /* ============================================================
+     HISTORY
+     ============================================================ */
+  .search{width:100%;margin-bottom:12px}
+  .hlist{display:grid;gap:10px;max-height:420px;overflow:auto}
+  .hitem{
+    display:flex;align-items:center;gap:12px;
+    background:var(--bg-2);border:1px solid var(--line);border-radius:12px;padding:12px;
+    cursor:pointer;transition:border .15s;
+  }
+  .hitem:hover{border-color:var(--gold-soft)}
+  .hno{width:44px;height:44px;flex:0 0 auto;border-radius:10px;display:grid;place-items:center;
+    background:rgba(231,181,60,.12);color:var(--gold-2);font-weight:700;font-size:13px}
+  .hmeta{min-width:0;flex:1}
+  .hmeta .n{font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .hmeta .d{font-size:11px;color:var(--muted)}
+  .htot{font-weight:700;color:var(--gold-2);font-size:15px;white-space:nowrap}
+  .empty{text-align:center;color:var(--muted);font-size:13px;padding:24px 8px}
+
+  /* ============================================================
+     TOAST
+     ============================================================ */
+  #toast{
+    position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);
+    background:#241c10;border:1px solid var(--gold-soft);color:var(--text);
+    padding:12px 18px;border-radius:12px;font-size:14px;box-shadow:var(--shadow);
+    opacity:0;pointer-events:none;transition:.25s;z-index:60;max-width:90vw;text-align:center;
+  }
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  #toast.err{border-color:var(--red)}
+  #toast.ok{border-color:var(--green)}
+
+  /* ============================================================
+     MODAL (bill preview)
+     ============================================================ */
+  .modal{position:fixed;inset:0;z-index:70;display:none;align-items:flex-end;justify-content:center;
+    background:rgba(0,0,0,.6);backdrop-filter:blur(3px)}
+  .modal.show{display:flex}
+  .sheet{
+    width:100%;max-width:520px;max-height:92dvh;overflow:auto;
+    background:var(--card);border:1px solid var(--line);
+    border-radius:20px 20px 0 0;padding:16px;animation:up .25s ease;
+  }
+  @media(min-width:560px){.modal{align-items:center}.sheet{border-radius:20px}}
+  @keyframes up{from{transform:translateY(30px);opacity:.4}}
+  .sheet-h{display:flex;align-items:center;margin-bottom:12px}
+  .sheet-h h3{margin:0;font-size:16px;color:var(--gold-2)}
+  .sheet-h .x{margin-left:auto;cursor:pointer;color:var(--muted);font-size:24px;line-height:1}
+
+  /* ============================================================
+     PRINTABLE INVOICE
+     ============================================================ */
+  #invoice{background:#fff;color:#111;border-radius:14px;padding:22px;font-size:13px}
+  #invoice .iv-head{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #caa227;padding-bottom:12px}
+  #invoice .iv-shop{font-size:20px;font-weight:800;color:#8a6d12;letter-spacing:.5px}
+  #invoice .iv-sub{font-size:11px;color:#555;margin-top:2px;line-height:1.5}
+  #invoice .iv-tag{text-align:right;font-size:11px;color:#555}
+  #invoice .iv-tag .big{font-size:15px;font-weight:700;color:#111}
+  #invoice .iv-cust{display:flex;justify-content:space-between;margin:14px 0;font-size:12px}
+  #invoice table{width:100%;border-collapse:collapse;margin-top:6px}
+  #invoice th{background:#f4ecd0;color:#6b530b;text-align:left;font-size:11px;padding:9px 10px;border:1px solid #e6d9ad}
+  #invoice td{padding:9px 10px;border:1px solid #eee;font-size:12px}
+  #invoice td.r,#invoice th.r{text-align:right}
+  #invoice .iv-tot{margin-top:12px;margin-left:auto;width:60%}
+  #invoice .iv-tot .row{display:flex;justify-content:space-between;padding:4px 0;font-size:12px;color:#444}
+  #invoice .iv-tot .grand{background:#8a6d12;color:#fff;border:none;border-radius:8px;padding:10px 12px;margin-top:6px}
+  #invoice .iv-tot .grand span{color:#ffe8a3}
+  #invoice .iv-tot .grand b{color:#fff;font-size:17px}
+  #invoice .iv-foot{text-align:center;margin-top:18px;font-size:11px;color:#777;border-top:1px dashed #ccc;padding-top:10px}
+
+  /* ============================================================
+     PRINT
+     ============================================================ */
+  @media print{
+    body *{visibility:hidden}
+    #invoice, #invoice *{visibility:visible}
+    #invoice{position:absolute;left:0;top:0;width:100%;border-radius:0;box-shadow:none}
+    @page{margin:12mm}
+  }
+
+  .foot-note{max-width:900px;margin:8px auto 0;padding:0 16px;font-size:11px;color:var(--muted);text-align:center;line-height:1.6}
+  .kbd{background:var(--bg-2);border:1px solid var(--line);border-radius:6px;padding:1px 6px;font-size:11px}
+
+  /* ============================================================
+     MOBILE — prevent any cropping / overflow
+     ============================================================ */
+  #invoice{overflow-x:auto}
+  @media(max-width:480px){
+    body{padding-bottom:88px}
+    .head-inner{padding:10px 12px;gap:10px}
+    .logo{width:38px;height:38px;font-size:18px}
+    .brand h1{font-size:15px}
+    .sync-text{display:none}           /* keep the dot, drop text so header never crops */
+    main{padding:12px;gap:12px}
+    .card-b{padding:13px}
+    .inp{font-size:16px;padding:12px}  /* 16px stops iOS zoom */
+    .with-unit .unit{font-size:11px;right:10px}
+    .grand b{font-size:22px}
+    .btns{gap:8px}
+    .btn{padding:12px 8px;font-size:13px}
+    .sheet{padding:12px}
+    #invoice{padding:14px;font-size:12px}
+    #invoice .iv-head{flex-direction:column;gap:8px}
+    #invoice .iv-tag{text-align:left}
+    #invoice .iv-tot{width:100%}
+    #invoice th,#invoice td{padding:7px 6px;font-size:11px}
+    .hmeta .n{font-size:13px}
+    .htot{font-size:14px}
+  }
+  @media(max-width:360px){
+    .grid2{grid-template-columns:1fr}   /* stack tiny screens so nothing is squeezed */
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="head-inner">
+    <div class="logo">💎</div>
+    <div class="brand">
+      <h1>Madhusri <span>Jewellers</span></h1>
+      <p id="shopLine">Point of Sale • Billing</p>
+    </div>
+    <div class="head-right">
+      <span class="sync-dot" id="syncDot"></span>
+      <span class="sync-text" id="syncText">Checking…</span>
+    </div>
+  </div>
+</header>
+
+<main>
+
+  <!-- ============ NEW BILL ============ -->
+  <section class="card">
+    <div class="card-h">
+      <span class="ico">🧾</span>
+      <h2 id="formTitle">New Bill</h2>
+      <span class="pill" id="billNoPill">Bill #—</span>
+    </div>
+    <div class="card-b">
+      <div class="edit-banner" id="editBanner">
+        ✏️ Editing <b id="editLabel"></b> — change fields &amp; tap Update.
+        <span id="cancelEdit">Cancel</span>
+      </div>
+      <div class="field">
+        <label for="name">Customer Name <span class="opt">(optional)</span></label>
+        <input class="inp" id="name" type="text" placeholder="e.g. Priya Sharma" autocomplete="off" />
+      </div>
+
+      <div class="field">
+        <label for="phone">Phone Number</label>
+        <input class="inp" id="phone" type="tel" inputmode="numeric" placeholder="10-digit mobile" autocomplete="off" />
+      </div>
+
+      <div class="field">
+        <label for="item">Item / Description</label>
+        <input class="inp" id="item" type="text" placeholder="e.g. Gold Chain 22K" autocomplete="off" />
+      </div>
+
+      <div class="grid2">
+        <div class="field">
+          <label class="req" for="weight">Weight</label>
+          <div class="with-unit">
+            <input class="inp" id="weight" type="number" inputmode="decimal" min="0" step="0.001" placeholder="0.000" />
+            <span class="unit">grams</span>
+          </div>
+        </div>
+        <div class="field">
+          <label class="req" for="rate">Rate / gram</label>
+          <div class="with-unit">
+            <input class="inp" id="rate" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00" />
+            <span class="unit">₹</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid2">
+        <div class="field">
+          <label for="wastage">Wastage</label>
+          <div class="with-unit">
+            <input class="inp" id="wastage" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0" value="0" />
+            <span class="unit">%</span>
+          </div>
+        </div>
+        <div class="field">
+          <label for="making">Making Charges</label>
+          <div class="with-unit">
+            <input class="inp" id="making" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00" />
+            <span class="unit">₹</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="gst">GST</label>
+        <div class="with-unit">
+          <input class="inp" id="gst" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0" value="0" />
+          <span class="unit">%</span>
+        </div>
+      </div>
+
+      <!-- LIVE TOTALS -->
+      <div class="totals">
+        <div class="trow"><span>Metal Value (wt × rate)</span><b id="tMetal">₹0.00</b></div>
+        <div class="trow"><span>Wastage (<span id="tWastPct">0</span>%)</span><b id="tWast">₹0.00</b></div>
+        <div class="trow"><span>Making Charges</span><b id="tMaking">₹0.00</b></div>
+        <div class="trow"><span>GST (<span id="tGstPct">0</span>%)</span><b id="tGst">₹0.00</b></div>
+        <div class="tdiv"></div>
+        <div class="grand">
+          <span>GRAND TOTAL</span>
+          <b id="tTotal">₹0.00</b>
+        </div>
+      </div>
+
+      <div class="btns">
+        <button class="btn primary full" id="saveBtn">💾 Save &amp; Generate Bill</button>
+        <button class="btn ghost" id="printBtn">🖨️ Print</button>
+        <button class="btn ghost" id="pdfBtn">⬇️ PDF</button>
+        <button class="btn wa full" id="waBtn">🟢 Share on WhatsApp</button>
+        <button class="btn ghost full" id="newBtn">➕ New / Clear</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ HISTORY ============ -->
+  <section class="card">
+    <div class="card-h">
+      <span class="ico">📚</span>
+      <h2>Bill History</h2>
+      <span class="pill" id="countPill">0 bills</span>
+    </div>
+    <div class="card-b">
+      <input class="inp search" id="search" type="text" placeholder="🔍 Search name / phone / bill no…" autocomplete="off" />
+      <div class="btns" style="margin-top:0;margin-bottom:12px">
+        <button class="btn ghost" id="refreshBtn">🔄 Sync from Sheet</button>
+        <button class="btn ghost" id="exportBtn">📤 Export CSV</button>
+      </div>
+      <div class="hlist" id="hlist">
+        <div class="empty">No bills yet. Create your first bill 👆</div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<p class="foot-note">
+  Tip: Press <span class="kbd">Enter</span> in any field to save. Bills are stored on this device and synced to your shop's Google Sheet.
+</p>
+
+<!-- ============ TOAST ============ -->
+<div id="toast"></div>
+
+<!-- ============ INVOICE MODAL ============ -->
+<div class="modal" id="modal">
+  <div class="sheet">
+    <div class="sheet-h">
+      <h3>Invoice Preview</h3>
+      <span class="x" id="closeModal">×</span>
+    </div>
+
+    <!-- printable / pdf area -->
+    <div id="invoice"></div>
+
+    <div class="btns">
+      <button class="btn primary" id="mPrint">🖨️ Print</button>
+      <button class="btn" id="mPdf">⬇️ Download PDF</button>
+      <button class="btn ghost full" id="mEdit">✏️ Edit this Bill</button>
+      <button class="btn wa full" id="mWa">🟢 Send on WhatsApp</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ================================================================
+   ███  MADHUSRI JEWELLERS POS  —  MULTI-SHOP CONFIG  ███
+   ================================================================
+   HOW TO USE FOR A NEW SHOP:
+   1. Copy this whole project.
+   2. Create the shop's Google Sheet + Apps Script (see README.md).
+   3. Paste the shop's Web App URL into GOOGLE_SCRIPT_URL below.
+   4. Update SHOP details.
+   Each shop = its own URL = its own isolated data. Nothing is shared.
+   ================================================================ */
+
+const CONFIG = {
+  // 🔑 UNIQUE PER SHOP — paste the Apps Script Web App URL here:
+  GOOGLE_SCRIPT_URL: "PASTE_YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL_HERE",
+
+  // 🏪 Shop identity (used on invoice, WhatsApp & to isolate local data)
+  SHOP: {
+    id:      "madhusri-main",              // must be UNIQUE per shop (used for localStorage keys)
+    name:    "Madhusri Jewellers",
+    tagline: "Gold • Silver • Diamond",
+    address: "Main Bazaar Road, Your City",
+    phone:   "919999999999",               // shop's own WhatsApp/contact (country code, no +)
+    gstin:   "",                           // optional GSTIN, shows on invoice if set
+    currency:"₹"
+  },
+
+  BILL_PREFIX: "MJ"   // shown as MJ-0001 etc.
+};
+
+/* ================================================================
+   UTILITIES
+   ================================================================ */
+const $  = (id) => document.getElementById(id);
+const CUR = CONFIG.SHOP.currency;
+const LS_BILLNO  = "mj_billno_"  + CONFIG.SHOP.id;
+const LS_HISTORY = "mj_history_" + CONFIG.SHOP.id;
+
+const num = (v) => { const n = parseFloat(v); return isFinite(n) ? n : 0; };
+const round2 = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
+const money = (n) => CUR + round2(n).toLocaleString("en-IN", {minimumFractionDigits:2, maximumFractionDigits:2});
+const pad = (n) => String(n).padStart(4, "0");
+const billLabel = (n) => CONFIG.BILL_PREFIX + "-" + pad(n);
+
+function toast(msg, type){
+  const t = $("toast");
+  t.textContent = msg;
+  t.className = "show " + (type||"");
+  clearTimeout(t._t);
+  t._t = setTimeout(()=> t.className = t.className.replace("show","").trim(), 2600);
+}
+
+function nowStamp(){
+  const d = new Date();
+  const dd = String(d.getDate()).padStart(2,"0");
+  const mm = String(d.getMonth()+1).padStart(2,"0");
+  const yy = d.getFullYear();
+  let h = d.getHours(), m = String(d.getMinutes()).padStart(2,"0");
+  const ap = h >= 12 ? "PM":"AM"; h = h%12 || 12;
+  return { date:`${dd}/${mm}/${yy}`, time:`${h}:${m} ${ap}`, iso:d.toISOString() };
+}
+
+/* ================================================================
+   STATE
+   ================================================================ */
+let history = loadHistory();
+let nextBillNo = loadBillNo();
+let lastBill = null; // last generated bill object (for print/pdf/whatsapp)
+let editingBillNo = null; // when set, saving updates this bill instead of creating new
+
+function loadHistory(){
+  try { return JSON.parse(localStorage.getItem(LS_HISTORY)) || []; }
+  catch(e){ return []; }
+}
+function saveHistory(){ localStorage.setItem(LS_HISTORY, JSON.stringify(history)); }
+
+function loadBillNo(){
+  const n = parseInt(localStorage.getItem(LS_BILLNO), 10);
+  return isFinite(n) && n > 0 ? n : 1;
+}
+function saveBillNo(n){ nextBillNo = n; localStorage.setItem(LS_BILLNO, String(n)); }
+
+/* ================================================================
+   LIVE CALCULATION  (no button — instant via oninput)
+   Formula:  metal   = weight * rate
+             wastage = metal * wastage% / 100
+             taxable = metal + wastage + making
+             gst     = taxable * gst% / 100
+             TOTAL   = taxable + gst
+   ================================================================ */
+function calc(){
+  const weight  = num($("weight").value);
+  const rate    = num($("rate").value);
+  const wastPct = num($("wastage").value);
+  const making  = num($("making").value);
+  const gstPct  = num($("gst").value);
+
+  const metal   = weight * rate;
+  const wastAmt = metal * wastPct / 100;
+  const taxable = metal + wastAmt + making;
+  const gstAmt  = taxable * gstPct / 100;
+  const total   = taxable + gstAmt;
+
+  $("tMetal").textContent  = money(metal);
+  $("tWastPct").textContent= round2(wastPct);
+  $("tWast").textContent   = money(wastAmt);
+  $("tMaking").textContent = money(making);
+  $("tGstPct").textContent = round2(gstPct);
+  $("tGst").textContent    = money(gstAmt);
+  $("tTotal").textContent  = money(total);
+
+  return {
+    weight, rate, wastPct, making, gstPct,
+    metal:round2(metal), wastAmt:round2(wastAmt),
+    gstAmt:round2(gstAmt), total:round2(total)
+  };
+}
+
+["weight","rate","wastage","making","gst"].forEach(id => $(id).addEventListener("input", calc));
+
+/* ================================================================
+   BUILD BILL OBJECT + VALIDATION
+   ================================================================ */
+function readForm(){
+  return {
+    name:  $("name").value.trim() || "Walk-in Customer",
+    phone: $("phone").value.replace(/[^\d]/g,""),
+    item:  $("item").value.trim() || "Jewellery",
+  };
+}
+
+function validate(f, c){
+  if(c.weight <= 0){ toast("Enter weight (grams)","err"); $("weight").focus(); return false; }
+  if(c.rate <= 0){ toast("Enter rate per gram","err"); $("rate").focus(); return false; }
+  return true;
+}
+
+/* ================================================================
+   SAVE BILL  → local + Google Sheet
+   (also handles UPDATE when editing an existing bill)
+   ================================================================ */
+async function saveBill(){
+  const f = readForm();
+  const c = calc();
+  if(!validate(f, c)) return;
+
+  const st = nowStamp();
+
+  // ---- EDIT MODE: update existing bill (keep its number & date) ----
+  if(editingBillNo != null){
+    const idx = history.findIndex(x => x.billNo === editingBillNo);
+    if(idx === -1){ editingBillNo = null; return saveBill(); }
+    const orig = history[idx];
+    const bill = Object.assign({}, orig, {
+      name:f.name, phone:f.phone, item:f.item,
+      weight:c.weight, rate:c.rate, wastPct:c.wastPct, wastAmt:c.wastAmt,
+      making:c.making, gstPct:c.gstPct, gstAmt:c.gstAmt,
+      metal:c.metal, total:c.total,
+      editedDate:st.date, editedTime:st.time
+    });
+    history[idx] = bill;
+    saveHistory();
+    lastBill = bill;
+    renderHistory();
+    exitEditMode();
+    toast("Bill " + bill.billLabel + " updated ✔", "ok");
+    openInvoice(bill);
+    syncToSheet(bill, "update");
+    return;
+  }
+
+  // ---- NEW BILL ----
+  const bill = {
+    billNo: nextBillNo,
+    billLabel: billLabel(nextBillNo),
+    name: f.name,
+    phone: f.phone,
+    item: f.item,
+    weight: c.weight,
+    rate: c.rate,
+    wastPct: c.wastPct,
+    wastAmt: c.wastAmt,
+    making: c.making,
+    gstPct: c.gstPct,
+    gstAmt: c.gstAmt,
+    metal: c.metal,
+    total: c.total,
+    date: st.date,
+    time: st.time,
+    iso: st.iso
+  };
+
+  // 1) save locally first (offline-safe)
+  history.unshift(bill);
+  saveHistory();
+  saveBillNo(nextBillNo + 1);
+  lastBill = bill;
+  renderHistory();
+  renderBillNo();
+
+  toast("Bill " + bill.billLabel + " saved ✔", "ok");
+  openInvoice(bill);
+
+  // 2) sync to Google Sheet (best-effort)
+  syncToSheet(bill, "add");
+}
+
+/* ================================================================
+   GOOGLE SHEETS  (text/plain avoids CORS preflight)
+   ================================================================ */
+function scriptReady(){
+  return CONFIG.GOOGLE_SCRIPT_URL && !CONFIG.GOOGLE_SCRIPT_URL.startsWith("PASTE_");
+}
+
+function setSync(state, label){
+  $("syncDot").className = "sync-dot " + (state||"");
+  $("syncText").textContent = label;
+}
+
+async function syncToSheet(bill, action){
+  action = action || "add";
+  if(!scriptReady()){ setSync("off","Offline (no sheet)"); return; }
+  setSync("busy","Syncing…");
+  try{
+    const res = await fetch(CONFIG.GOOGLE_SCRIPT_URL, {
+      method:"POST",
+      headers:{ "Content-Type":"text/plain;charset=utf-8" },
+      body: JSON.stringify({ action:action, shopId:CONFIG.SHOP.id, bill })
+    });
+    const data = await res.json();
+    if(data && data.ok){
+      setSync("ok", action==="update" ? "Updated in Sheet" : "Synced to Sheet");
+      // keep numbering aligned with server
+      if(data.nextBillNo && data.nextBillNo > nextBillNo) saveBillNo(data.nextBillNo);
+    } else {
+      throw new Error(data && data.error || "Sheet error");
+    }
+  }catch(e){
+    setSync("off","Saved locally • sync failed");
+    toast("Saved locally. Sheet sync failed.", "err");
+  }
+}
+
+/* Fetch latest bill number + history from the sheet on load */
+async function pullFromSheet(){
+  if(!scriptReady()){ setSync("off","Offline mode"); return; }
+  setSync("busy","Connecting…");
+  try{
+    const url = CONFIG.GOOGLE_SCRIPT_URL
+      + "?action=list&shopId=" + encodeURIComponent(CONFIG.SHOP.id);
+    const res = await fetch(url);
+    const data = await res.json();
+    if(!data || !data.ok) throw new Error("bad response");
+
+    // align bill number
+    if(data.nextBillNo && data.nextBillNo > nextBillNo) saveBillNo(data.nextBillNo);
+
+    // merge remote bills (by billNo) into local history
+    if(Array.isArray(data.bills) && data.bills.length){
+      mergeHistory(data.bills);
+    }
+    setSync("ok","Connected • " + history.length + " bills");
+    renderHistory();
+    renderBillNo();
+  }catch(e){
+    setSync("off","Offline • local data");
+  }
+}
+
+function mergeHistory(remote){
+  const seen = new Map();
+  history.forEach(b => seen.set(b.billNo, b));
+  remote.forEach(b => { if(!seen.has(b.billNo)) seen.set(b.billNo, b); });
+  history = Array.from(seen.values()).sort((a,b)=> b.billNo - a.billNo);
+  saveHistory();
+}
+
+/* ================================================================
+   INVOICE (HTML for print + pdf)
+   ================================================================ */
+function invoiceHTML(b){
+  const S = CONFIG.SHOP;
+  const gstinRow = S.gstin ? `<div>GSTIN: ${S.gstin}</div>` : "";
+  const wastPct = num(b.wastPct), wastAmt = num(b.wastAmt);
+  const wastRow = wastPct > 0
+    ? `<div class="row"><span>Wastage (${round2(wastPct)}%)</span><span>${money(wastAmt)}</span></div>` : "";
+  const gstRow = b.gstPct > 0
+    ? `<div class="row"><span>GST (${round2(b.gstPct)}%)</span><span>${money(b.gstAmt)}</span></div>` : "";
+  return `
+    <div class="iv-head">
+      <div>
+        <div class="iv-shop">${S.name}</div>
+        <div class="iv-sub">${S.tagline}<br>${S.address}<br>☎ +${S.phone}${gstinRow?'<br>'+gstinRow:''}</div>
+      </div>
+      <div class="iv-tag">
+        <div>TAX INVOICE</div>
+        <div class="big">${b.billLabel}</div>
+        <div>${b.date}</div>
+        <div>${b.time}</div>
+      </div>
+    </div>
+
+    <div class="iv-cust">
+      <div><b>Billed To:</b><br>${b.name}${b.phone?'<br>☎ '+b.phone:''}</div>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Item</th><th class="r">Weight (g)</th><th class="r">Rate/g</th><th class="r">Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>${b.item}</td>
+          <td class="r">${round2(b.weight)}</td>
+          <td class="r">${money(b.rate)}</td>
+          <td class="r">${money(b.metal)}</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="iv-tot">
+      <div class="row"><span>Metal Value</span><span>${money(b.metal)}</span></div>
+      ${wastRow}
+      <div class="row"><span>Making Charges</span><span>${money(b.making)}</span></div>
+      ${gstRow}
+      <div class="grand" style="display:flex;justify-content:space-between;align-items:center">
+        <span>GRAND TOTAL</span><b>${money(b.total)}</b>
+      </div>
+    </div>
+
+    <div class="iv-foot">
+      Thank you for shopping with ${S.name}! • This is a computer-generated invoice.
+    </div>`;
+}
+
+function openInvoice(b){
+  lastBill = b;
+  $("invoice").innerHTML = invoiceHTML(b);
+  $("modal").classList.add("show");
+}
+function closeInvoice(){ $("modal").classList.remove("show"); }
+
+/* ================================================================
+   PRINT + PDF + WHATSAPP
+   ================================================================ */
+function printBill(b){
+  if(b && (!lastBill || lastBill.billNo !== b.billNo)) openInvoice(b);
+  else if(!lastBill && b) openInvoice(b);
+  setTimeout(()=> window.print(), 120);
+}
+
+async function downloadPDF(b){
+  b = b || lastBill;
+  if(!b){ toast("Create a bill first","err"); return; }
+  if(!$("invoice").innerHTML || (lastBill && lastBill.billNo !== b.billNo)){
+    $("invoice").innerHTML = invoiceHTML(b);
+  }
+  try{
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ unit:"pt", format:"a4" });
+    await doc.html($("invoice"), {
+      x:24, y:24,
+      html2canvas:{ scale:0.72, backgroundColor:"#ffffff" },
+      width: 547,               // A4 width (595) - margins
+      windowWidth: $("invoice").scrollWidth || 520
+    });
+    doc.save(b.billLabel + "_" + b.name.replace(/\s+/g,"_") + ".pdf");
+    toast("PDF downloaded ⬇️","ok");
+  }catch(e){
+    toast("PDF failed — using Print instead","err");
+    printBill(b);
+  }
+}
+
+function waMessage(b){
+  const S = CONFIG.SHOP;
+  const L = [];
+  L.push(`*${S.name}*`);
+  L.push(S.tagline);
+  L.push("--------------------------------");
+  L.push(`🧾 Bill No: *${b.billLabel}*`);
+  L.push(`📅 ${b.date}  ${b.time}`);
+  L.push(`👤 ${b.name}`);
+  L.push("--------------------------------");
+  L.push(`🔸 Item: ${b.item}`);
+  L.push(`⚖️ Weight: ${round2(b.weight)} g`);
+  L.push(`💰 Rate/g: ${money(b.rate)}`);
+  L.push(`🏷️ Metal Value: ${money(b.metal)}`);
+  if(num(b.wastPct)>0) L.push(`♻️ Wastage (${round2(b.wastPct)}%): ${money(b.wastAmt)}`);
+  L.push(`🔧 Making: ${money(b.making)}`);
+  if(b.gstPct>0) L.push(`🧾 GST (${round2(b.gstPct)}%): ${money(b.gstAmt)}`);
+  L.push("--------------------------------");
+  L.push(`✅ *TOTAL: ${money(b.total)}*`);
+  L.push("--------------------------------");
+  L.push(`Thank you for shopping with us! 🙏`);
+  return L.join("\n");
+}
+
+function shareWhatsApp(b){
+  b = b || lastBill;
+  if(!b){ toast("Create a bill first","err"); return; }
+  const txt = encodeURIComponent(waMessage(b));
+  // If customer phone present, open direct chat, else generic share
+  const phone = (b.phone && b.phone.length >= 10) ? b.phone : "";
+  const url = phone ? `https://wa.me/91${phone}?text=${txt}` : `https://wa.me/?text=${txt}`;
+  window.open(url, "_blank");
+}
+
+/* ================================================================
+   RENDER
+   ================================================================ */
+function renderBillNo(){
+  $("billNoPill").textContent = "Bill " + billLabel(nextBillNo);
+}
+
+function renderHistory(filter){
+  const list = $("hlist");
+  const q = (filter||"").toLowerCase().trim();
+  const rows = history.filter(b => !q ||
+    b.name.toLowerCase().includes(q) ||
+    (b.phone||"").includes(q) ||
+    b.billLabel.toLowerCase().includes(q));
+
+  $("countPill").textContent = history.length + (history.length===1?" bill":" bills");
+
+  if(!rows.length){
+    list.innerHTML = `<div class="empty">${history.length? "No matches found." : "No bills yet. Create your first bill 👆"}</div>`;
+    return;
+  }
+  list.innerHTML = rows.map((b,i)=>`
+    <div class="hitem" data-no="${b.billNo}">
+      <div class="hno">${pad(b.billNo)}</div>
+      <div class="hmeta">
+        <div class="n">${b.name} • ${b.item}</div>
+        <div class="d">${b.billLabel} • ${b.date} ${b.time||""}</div>
+      </div>
+      <div class="htot">${money(b.total)}</div>
+    </div>`).join("");
+
+  list.querySelectorAll(".hitem").forEach(el=>{
+    el.addEventListener("click", ()=>{
+      const b = history.find(x=> x.billNo === +el.dataset.no);
+      if(b) openInvoice(b);
+    });
+  });
+}
+
+/* ================================================================
+   EXPORT CSV
+   ================================================================ */
+function exportCSV(){
+  if(!history.length){ toast("Nothing to export","err"); return; }
+  const head = ["BillNo","Bill","Name","Phone","Item","Weight","Rate","Wastage%","WastageAmt","Making","GST%","GSTAmt","MetalValue","Total","Date","Time"];
+  const rows = history.map(b=>[
+    b.billNo,b.billLabel,b.name,b.phone,b.item,b.weight,b.rate,(b.wastPct||0),(b.wastAmt||0),b.making,b.gstPct,b.gstAmt,b.metal,b.total,b.date,b.time
+  ].map(v=>`"${String(v==null?"":v).replace(/"/g,'""')}"`).join(","));
+  const csv = [head.join(","), ...rows].join("\n");
+  const blob = new Blob([csv], {type:"text/csv"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = CONFIG.SHOP.id + "_bills.csv";
+  a.click();
+  toast("CSV exported 📤","ok");
+}
+
+/* ================================================================
+   NEW / CLEAR
+   ================================================================ */
+function clearForm(){
+  exitEditMode();
+  ["name","phone","item","weight","rate","making"].forEach(id=> $(id).value="");
+  $("wastage").value = "0";
+  $("gst").value = "0";
+  calc();
+  $("name").focus();
+}
+
+/* ================================================================
+   EDIT MODE  (load a saved bill back into the form)
+   ================================================================ */
+function startEdit(b){
+  if(!b) return;
+  editingBillNo = b.billNo;
+  $("name").value    = (b.name === "Walk-in Customer") ? "" : (b.name || "");
+  $("phone").value   = b.phone || "";
+  $("item").value    = (b.item === "Jewellery") ? "" : (b.item || "");
+  $("weight").value  = b.weight || "";
+  $("rate").value    = b.rate || "";
+  $("wastage").value = b.wastPct || 0;
+  $("making").value  = b.making || "";
+  $("gst").value     = b.gstPct || 0;
+  calc();
+
+  $("formTitle").textContent = "Edit Bill";
+  $("saveBtn").innerHTML = "✅ Update Bill";
+  $("editLabel").textContent = b.billLabel;
+  $("editBanner").classList.add("show");
+  closeInvoice();
+  window.scrollTo({ top:0, behavior:"smooth" });
+  $("name").focus();
+}
+
+function exitEditMode(){
+  editingBillNo = null;
+  $("formTitle").textContent = "New Bill";
+  $("saveBtn").innerHTML = "💾 Save &amp; Generate Bill";
+  $("editBanner").classList.remove("show");
+}
+
+/* ================================================================
+   WIRE UP EVENTS
+   ================================================================ */
+$("saveBtn").addEventListener("click", saveBill);
+$("printBtn").addEventListener("click", ()=>{ if(lastBill) printBill(lastBill); else toast("Save a bill first","err"); });
+$("pdfBtn").addEventListener("click", ()=> downloadPDF());
+$("waBtn").addEventListener("click", ()=> shareWhatsApp());
+$("newBtn").addEventListener("click", clearForm);
+$("cancelEdit").addEventListener("click", clearForm);
+
+$("mPrint").addEventListener("click", ()=> printBill(lastBill));
+$("mPdf").addEventListener("click", ()=> downloadPDF());
+$("mEdit").addEventListener("click", ()=> startEdit(lastBill));
+$("mWa").addEventListener("click", ()=> shareWhatsApp());
+$("closeModal").addEventListener("click", closeInvoice);
+$("modal").addEventListener("click", (e)=>{ if(e.target === $("modal")) closeInvoice(); });
+
+$("search").addEventListener("input", (e)=> renderHistory(e.target.value));
+$("refreshBtn").addEventListener("click", pullFromSheet);
+$("exportBtn").addEventListener("click", exportCSV);
+
+// Enter key = save
+["name","phone","item","weight","rate","wastage","making","gst"].forEach(id=>{
+  $(id).addEventListener("keydown", (e)=>{ if(e.key==="Enter"){ e.preventDefault(); saveBill(); }});
+});
+
+/* ================================================================
+   INIT
+   ================================================================ */
+function init(){
+  $("shopLine").textContent = CONFIG.SHOP.name + " • Billing";
+  document.title = CONFIG.SHOP.name + " • POS";
+  calc();
+  renderBillNo();
+  renderHistory();
+  pullFromSheet();      // fetch bill number + history from sheet
+}
+init();
+</script>
+</body>
+</html>
