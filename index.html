@@ -8,6 +8,7 @@
 
 <!-- jsPDF (library, works on GitHub Pages via CDN) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
 <style>
   /* ============================================================
@@ -127,6 +128,8 @@
   }
   .inp:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(231,181,60,.18)}
   .inp::placeholder{color:#6c6244}
+  @keyframes caretGlow{0%{border-color:var(--gold-2)}100%{border-color:var(--gold)}}
+  .inp.typing{animation:caretGlow .35s ease}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
   .with-unit{position:relative}
   .with-unit .unit{position:absolute;right:12px;top:50%;transform:translateY(-50%);
@@ -137,7 +140,8 @@
      ============================================================ */
   .totals{display:grid;gap:8px;margin-top:4px}
   .trow{display:flex;justify-content:space-between;font-size:14px;color:var(--muted)}
-  .trow b{color:var(--text);font-weight:600}
+  .trow b{color:var(--text);font-weight:600;font-variant-numeric:tabular-nums;transition:color .2s}
+  .trow b.roll{color:var(--gold-2)}
   .tdiv{height:1px;background:var(--line);margin:6px 0}
   .grand{
     display:flex;justify-content:space-between;align-items:center;
@@ -145,7 +149,9 @@
     border:1px solid var(--gold-soft);border-radius:14px;padding:14px 16px;margin-top:6px;
   }
   .grand span{font-size:13px;color:var(--gold-2);letter-spacing:.5px}
-  .grand b{font-size:26px;color:var(--gold-2);font-variant-numeric:tabular-nums}
+  .grand b{font-size:26px;color:var(--gold-2);font-variant-numeric:tabular-nums;display:inline-block;transform-origin:right center}
+  @keyframes totalBump{0%{transform:scale(1)}28%{transform:scale(1.07)}100%{transform:scale(1)}}
+  .grand b.bump{animation:totalBump .38s cubic-bezier(.34,1.56,.64,1)}
 
   /* ============================================================
      BUTTONS
@@ -275,6 +281,10 @@
   }
   @media(max-width:360px){
     .grid2{grid-template-columns:1fr}   /* stack tiny screens so nothing is squeezed */
+  }
+  @media (prefers-reduced-motion: reduce){
+    .inp.typing, .grand b.bump{animation:none !important}
+    *{scroll-behavior:auto !important}
   }
 </style>
 </head>
@@ -467,6 +477,20 @@ const CONFIG = {
 };
 
 /* ================================================================
+   ███  FEATURE FLAGS  ███
+   ================================================================
+   Turn features ON/OFF here to roll them out one by one.
+   Set a flag to false and its button(s) + flow disappear everywhere
+   (main screen AND invoice preview). No other code changes needed.
+   ================================================================ */
+const FEATURES = {
+  print:    false,   // 🖨️  Print bill
+  download: true,   // ⬇️  Download PDF
+  edit:     true,   // ✏️  Edit an existing bill
+  whatsapp: true    // 🟢  Send / share on WhatsApp
+};
+
+/* ================================================================
    UTILITIES
    ================================================================ */
 const $  = (id) => document.getElementById(id);
@@ -539,19 +563,50 @@ function calc(){
   const gstAmt  = taxable * gstPct / 100;
   const total   = taxable + gstAmt;
 
-  $("tMetal").textContent  = money(metal);
+  animateMoney($("tMetal"),  metal);
   $("tWastPct").textContent= round2(wastPct);
-  $("tWast").textContent   = money(wastAmt);
-  $("tMaking").textContent = money(making);
+  animateMoney($("tWast"),   wastAmt);
+  animateMoney($("tMaking"), making);
   $("tGstPct").textContent = round2(gstPct);
-  $("tGst").textContent    = money(gstAmt);
-  $("tTotal").textContent  = money(total);
+  animateMoney($("tGst"),    gstAmt);
+  animateMoney($("tTotal"),  total, true);
 
   return {
     weight, rate, wastPct, making, gstPct,
     metal:round2(metal), wastAmt:round2(wastAmt),
     gstAmt:round2(gstAmt), total:round2(total)
   };
+}
+
+/* Animated "digit rolling" counter for the live totals.
+   Tweens the number from its previous value to the new one
+   with an ease-out so the digits visibly scroll/count. */
+const prefersReducedMotion = window.matchMedia &&
+  window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+function animateMoney(el, to, isGrand){
+  to = round2(to);
+  const from = (el._val == null) ? to : el._val;
+  el._val = to;
+
+  if(prefersReducedMotion || from === to){
+    el.textContent = money(to);
+    return;
+  }
+
+  cancelAnimationFrame(el._raf);
+  el.classList.add("roll");
+  if(isGrand){ el.classList.remove("bump"); void el.offsetWidth; el.classList.add("bump"); }
+
+  const dur = 380, start = performance.now();
+  const tick = (now)=>{
+    const p = Math.min(1, (now - start) / dur);
+    const eased = 1 - Math.pow(1 - p, 3);   // easeOutCubic
+    el.textContent = money(from + (to - from) * eased);
+    if(p < 1){ el._raf = requestAnimationFrame(tick); }
+    else { el.textContent = money(to); el.classList.remove("roll"); }
+  };
+  el._raf = requestAnimationFrame(tick);
 }
 
 ["weight","rate","wastage","making","gst"].forEach(id => $(id).addEventListener("input", calc));
@@ -777,38 +832,90 @@ function openInvoice(b){
   lastBill = b;
   $("invoice").innerHTML = invoiceHTML(b);
   $("modal").classList.add("show");
+  document.body.style.overflow = "hidden";   // lock background scroll
 }
-function closeInvoice(){ $("modal").classList.remove("show"); }
+function closeInvoice(){
+  $("modal").classList.remove("show");
+  document.body.style.overflow = "";         // always restore scrolling
+}
 
 /* ================================================================
    PRINT + PDF + WHATSAPP
    ================================================================ */
 function printBill(b){
+  if(!FEATURES.print) return;
   if(b && (!lastBill || lastBill.billNo !== b.billNo)) openInvoice(b);
   else if(!lastBill && b) openInvoice(b);
   setTimeout(()=> window.print(), 120);
 }
 
 async function downloadPDF(b){
+  if(!FEATURES.download) return;
   b = b || lastBill;
   if(!b){ toast("Create a bill first","err"); return; }
+
+  // Make sure the (visible) invoice reflects this bill.
   if(!$("invoice").innerHTML || (lastBill && lastBill.billNo !== b.billNo)){
     $("invoice").innerHTML = invoiceHTML(b);
   }
+
+  // Render from an OFF-SCREEN clone so the on-screen preview is never
+  // disturbed and nothing "flashes" on the page during generation.
+  const holder = document.createElement("div");
+  holder.setAttribute("aria-hidden", "true");
+  holder.style.cssText = "position:fixed;left:-10000px;top:0;width:520px;background:#fff;pointer-events:none;z-index:-1;";
+  const clone = $("invoice").cloneNode(true);
+  clone.removeAttribute("id");
+  clone.id = "invoice";                    // keep the #invoice styles
+  clone.style.borderRadius = "0";
+  holder.appendChild(clone);
+  document.body.appendChild(holder);
+
   try{
+    if(!window.html2canvas) throw new Error("html2canvas missing");
     const { jsPDF } = window.jspdf;
-    const doc = new jsPDF({ unit:"pt", format:"a4" });
-    await doc.html($("invoice"), {
-      x:24, y:24,
-      html2canvas:{ scale:0.72, backgroundColor:"#ffffff" },
-      width: 547,               // A4 width (595) - margins
-      windowWidth: $("invoice").scrollWidth || 520
+
+    // 1) rasterise the invoice at good resolution
+    const canvas = await html2canvas(clone, {
+      scale: 2,
+      backgroundColor: "#ffffff",
+      useCORS: true,
+      windowWidth: clone.scrollWidth || 520
     });
-    doc.save(b.billLabel + "_" + b.name.replace(/\s+/g,"_") + ".pdf");
+
+    // 2) fit the whole thing onto ONE A4 page (no second page ever)
+    const pdf = new jsPDF({ unit:"pt", format:"a4" });
+    const pageW = pdf.internal.pageSize.getWidth();
+    const pageH = pdf.internal.pageSize.getHeight();
+    const margin = 24;
+    const maxW = pageW - margin * 2;
+    const maxH = pageH - margin * 2;
+
+    let imgW = maxW;
+    let imgH = (canvas.height / canvas.width) * imgW;
+    if(imgH > maxH){                          // too tall → scale down to fit height
+      imgH = maxH;
+      imgW = (canvas.width / canvas.height) * imgH;
+    }
+    const x = (pageW - imgW) / 2;             // centre horizontally
+    const y = margin;
+
+    pdf.addImage(canvas.toDataURL("image/jpeg", 0.92), "JPEG", x, y, imgW, imgH);
+    pdf.save(b.billLabel + "_" + b.name.replace(/\s+/g,"_") + ".pdf");
     toast("PDF downloaded ⬇️","ok");
   }catch(e){
     toast("PDF failed — using Print instead","err");
     printBill(b);
+  }finally{
+    // ---- CLEANUP: this is what prevents the "buttons stop working /
+    // can't close the page" bug. html2canvas can leave invisible
+    // overlay/iframe nodes that swallow every click. Remove them all. ----
+    holder.remove();
+    document.querySelectorAll(".html2canvas-container").forEach(n=> n.remove());
+    document.querySelectorAll("iframe").forEach(f=>{
+      const s = f.style || {};
+      if(s.left === "-10000px" || f.className.indexOf("html2canvas") !== -1) f.remove();
+    });
   }
 }
 
@@ -837,6 +944,7 @@ function waMessage(b){
 }
 
 function shareWhatsApp(b){
+  if(!FEATURES.whatsapp) return;
   b = b || lastBill;
   if(!b){ toast("Create a bill first","err"); return; }
   const txt = encodeURIComponent(waMessage(b));
@@ -919,6 +1027,7 @@ function clearForm(){
    EDIT MODE  (load a saved bill back into the form)
    ================================================================ */
 function startEdit(b){
+  if(!FEATURES.edit) return;
   if(!b) return;
   editingBillNo = b.billNo;
   $("name").value    = (b.name === "Walk-in Customer") ? "" : (b.name || "");
@@ -968,10 +1077,121 @@ $("search").addEventListener("input", (e)=> renderHistory(e.target.value));
 $("refreshBtn").addEventListener("click", pullFromSheet);
 $("exportBtn").addEventListener("click", exportCSV);
 
+// Esc closes the invoice preview (extra safety so you're never "stuck")
+document.addEventListener("keydown", (e)=>{
+  if(e.key === "Escape" && $("modal").classList.contains("show")) closeInvoice();
+});
+
+/* ================================================================
+   TYPING UX
+   • subtle pulse on the field as you type
+   • on mobile, smoothly scroll the focused field into view so it is
+     never hidden behind the on-screen keyboard
+   ================================================================ */
+const FORM_FIELDS = ["name","phone","item","weight","rate","wastage","making","gst"];
+
+FORM_FIELDS.forEach(id=>{
+  const el = $(id);
+  el.addEventListener("input", ()=>{
+    el.classList.remove("typing");
+    void el.offsetWidth;            // restart the animation on every keystroke
+    el.classList.add("typing");
+  });
+  el.addEventListener("animationend", ()=> el.classList.remove("typing"));
+
+  // Keep the active field comfortably in view above the keyboard.
+  el.addEventListener("focus", ()=>{
+    activeField = el;
+    ensureFieldVisible(el);
+  });
+  el.addEventListener("blur", ()=>{ if(activeField === el) activeField = null; });
+});
+
+/* Smoothly lift the focused field above the on-screen keyboard.
+   Uses visualViewport (the reliable way to know the keyboard height on
+   mobile) and falls back to scrollIntoView on older browsers. */
+let activeField = null;
+
+function ensureFieldVisible(el){
+  const vv = window.visualViewport;
+  // First pass: wait for the keyboard animation to begin.
+  setTimeout(()=>{
+    if(!el || document.activeElement !== el) return;
+    if(vv){
+      const rect = el.getBoundingClientRect();
+      const keyboardTop = vv.height + vv.offsetTop;     // bottom of visible area
+      const margin = 24;
+      // If the field is hidden behind (or too close to) the keyboard, lift it.
+      if(rect.bottom > keyboardTop - margin){
+        const delta = rect.bottom - (keyboardTop - margin);
+        window.scrollBy({ top: delta, left: 0, behavior: "smooth" });
+      } else if(rect.top < vv.offsetTop + margin){
+        window.scrollBy({ top: rect.top - (vv.offsetTop + margin), behavior: "smooth" });
+      }
+    } else {
+      try{ el.scrollIntoView({ behavior:"smooth", block:"center" }); }
+      catch(_){ el.scrollIntoView(); }
+    }
+  }, 300);
+}
+
+// When the keyboard actually opens/resizes the viewport, re-check the field.
+if(window.visualViewport){
+  let vvTimer;
+  window.visualViewport.addEventListener("resize", ()=>{
+    if(!activeField) return;
+    clearTimeout(vvTimer);
+    vvTimer = setTimeout(()=> ensureFieldVisible(activeField), 60);
+  });
+}
+
 // Enter key = save
 ["name","phone","item","weight","rate","wastage","making","gst"].forEach(id=>{
   $(id).addEventListener("keydown", (e)=>{ if(e.key==="Enter"){ e.preventDefault(); saveBill(); }});
 });
+
+/* ================================================================
+   FEATURE FLAGS  →  show / hide flows
+   ================================================================ */
+function applyFeatureFlags(){
+  // buttonId  →  feature flag that controls it
+  const map = {
+    // main form
+    printBtn: "print",
+    pdfBtn:   "download",
+    waBtn:    "whatsapp",
+    // invoice preview modal
+    mPrint:   "print",
+    mPdf:     "download",
+    mEdit:    "edit",
+    mWa:      "whatsapp"
+  };
+  Object.keys(map).forEach(id=>{
+    const el = $(id);
+    if(el) el.style.display = FEATURES[map[id]] ? "" : "none";
+  });
+
+  // ---- LAYOUT: keep the button grids tidy ----
+  // Print & PDF share a 2-column row. If only ONE of the pair is on,
+  // let it span the full width instead of sitting as a lonely half-button.
+  const balancePair = (aId, bId)=>{
+    const a = $(aId), b = $(bId);
+    if(!a || !b) return;
+    const aOn = FEATURES[map[aId]], bOn = FEATURES[map[bId]];
+    a.classList.toggle("full", aOn && !bOn);   // only Print on  → full
+    b.classList.toggle("full", bOn && !aOn);   // only PDF on    → full
+  };
+  balancePair("printBtn", "pdfBtn");           // main form
+  balancePair("mPrint",   "mPdf");             // invoice modal
+
+  // If nothing in the modal's action row is enabled, hide the whole row
+  // so the preview doesn't show an empty gap.
+  const modalRow = $("mPrint") ? $("mPrint").closest(".btns") : null;
+  if(modalRow){
+    const anyModalBtn = FEATURES.print || FEATURES.download || FEATURES.edit || FEATURES.whatsapp;
+    modalRow.style.display = anyModalBtn ? "" : "none";
+  }
+}
 
 /* ================================================================
    INIT
@@ -979,6 +1199,7 @@ $("exportBtn").addEventListener("click", exportCSV);
 function init(){
   $("shopLine").textContent = CONFIG.SHOP.name + " • Billing";
   document.title = CONFIG.SHOP.name + " • POS";
+  applyFeatureFlags();
   calc();
   renderBillNo();
   renderHistory();
