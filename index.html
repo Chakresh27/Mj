@@ -457,8 +457,8 @@ const CONFIG = {
     id:      "madhusri-main",              // must be UNIQUE per shop (used for localStorage keys)
     name:    "Madhusri Jewellers",
     tagline: "Gold • Silver • Diamond",
-    address: "Main Bazaar Road, Your City",
-    phone:   "919999999999",               // shop's own WhatsApp/contact (country code, no +)
+    address: "Gandhi Road, Ongole",
+    phone:   "+91 9290555266",               // shop's own WhatsApp/contact (country code, no +)
     gstin:   "",                           // optional GSTIN, shows on invoice if set
     currency:"₹"
   },
@@ -731,7 +731,7 @@ function invoiceHTML(b){
         <div class="iv-sub">${S.tagline}<br>${S.address}<br>☎ +${S.phone}${gstinRow?'<br>'+gstinRow:''}</div>
       </div>
       <div class="iv-tag">
-        <div>TAX INVOICE</div>
+        <div>INVOICE</div>
         <div class="big">${b.billLabel}</div>
         <div>${b.date}</div>
         <div>${b.time}</div>
