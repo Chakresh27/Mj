@@ -182,6 +182,28 @@
   .grand b.bump{animation:totalBump .38s cubic-bezier(.34,1.56,.64,1)}
 
   /* ============================================================
+     FLOATING LIVE TOTAL (mobile — visible above the keyboard)
+     ============================================================ */
+  #liveBar{
+    position:fixed;top:0;left:0;right:0;z-index:75;
+    display:flex;align-items:center;gap:10px;
+    padding:10px 16px;
+    background:linear-gradient(90deg, rgba(28,22,13,.98), rgba(35,27,16,.98));
+    border-bottom:1px solid var(--gold-soft);
+    box-shadow:0 6px 20px rgba(0,0,0,.45);
+    transform:translateY(-110%);transition:transform .28s cubic-bezier(.34,1.3,.64,1);
+    backdrop-filter:blur(8px);
+  }
+  #liveBar.show{transform:translateY(0)}
+  #liveBar .lb-ico{font-size:16px}
+  #liveBar .lb-label{font-size:12px;letter-spacing:.5px;color:var(--gold-2);text-transform:uppercase}
+  #liveBar .lb-val{margin-left:auto;font-size:22px;font-weight:800;color:var(--gold-2);
+    font-variant-numeric:tabular-nums;display:inline-block;transform-origin:right center}
+  #liveBar .lb-val.bump{animation:totalBump .38s cubic-bezier(.34,1.56,.64,1)}
+  /* only ever show it on smaller screens where the keyboard is a problem */
+  @media(min-width:820px){ #liveBar{display:none} }
+
+  /* ============================================================
      BUTTONS
      ============================================================ */
   .btns{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px}
@@ -360,6 +382,13 @@
 </style>
 </head>
 <body>
+
+<!-- ============ FLOATING LIVE TOTAL (mobile) ============ -->
+<div id="liveBar">
+  <span class="lb-ico">🧮</span>
+  <span class="lb-label">Live Total</span>
+  <span class="lb-val" id="lbVal">₹0.00</span>
+</div>
 
 <header>
   <div class="head-inner">
@@ -657,6 +686,10 @@ function calc(){
   $("tGstPct").textContent = round2(gstPct);
   animateMoney($("tGst"),    gstAmt);
   animateMoney($("tTotal"),  total, true);
+
+  // mirror into the floating mobile bar
+  const lb = $("lbVal");
+  if(lb) animateMoney(lb, total, true);
 
   return {
     weight, rate, wastPct, making, gstPct,
@@ -1239,10 +1272,29 @@ FORM_FIELDS.forEach(id=>{
   // Keep the active field comfortably in view above the keyboard.
   el.addEventListener("focus", ()=>{
     activeField = el;
+    showLiveBar();
     ensureFieldVisible(el);
   });
-  el.addEventListener("blur", ()=>{ if(activeField === el) activeField = null; });
+  el.addEventListener("blur", ()=>{
+    if(activeField === el) activeField = null;
+    hideLiveBarSoon();
+  });
 });
+
+/* Floating live-total bar — only useful on mobile where the keyboard
+   hides the on-screen totals. Shows while a field is focused. */
+function showLiveBar(){
+  clearTimeout(hideLiveBarSoon._t);
+  const lb = $("liveBar");
+  if(lb) lb.classList.add("show");
+}
+function hideLiveBarSoon(){
+  clearTimeout(hideLiveBarSoon._t);
+  // small delay so tapping between fields doesn't flicker the bar
+  hideLiveBarSoon._t = setTimeout(()=>{
+    if(!activeField){ const lb = $("liveBar"); if(lb) lb.classList.remove("show"); }
+  }, 200);
+}
 
 /* Smoothly lift the focused field above the on-screen keyboard.
    Uses visualViewport (the reliable way to know the keyboard height on
@@ -1275,11 +1327,17 @@ function ensureFieldVisible(el){
 // When the keyboard actually opens/resizes the viewport, re-check the field.
 if(window.visualViewport){
   let vvTimer;
+  const syncBar = ()=>{
+    const lb = $("liveBar");
+    if(lb) lb.style.top = (window.visualViewport.offsetTop || 0) + "px";
+  };
   window.visualViewport.addEventListener("resize", ()=>{
+    syncBar();
     if(!activeField) return;
     clearTimeout(vvTimer);
     vvTimer = setTimeout(()=> ensureFieldVisible(activeField), 60);
   });
+  window.visualViewport.addEventListener("scroll", syncBar);
 }
 
 // Enter key = save
